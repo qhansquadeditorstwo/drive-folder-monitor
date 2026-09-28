@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Drive Folder Monitor v7</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+body{font-family:Arial;background:#f1f5f9;margin:0}
+.header{background:#111827;color:white;padding:20px;text-align:center;font-size:26px}
+.container{max-width:850px;margin:30px auto;padding:20px}
+.card{background:white;padding:20px;border-radius:12px;margin-bottom:20px}
+button,input{width:100%;padding:12px;margin-top:10px;border-radius:8px;border:1px solid #ccc}
+button{background:#2563eb;color:white;border:0;cursor:pointer}
+.folder{padding:12px;border-bottom:1px solid #ddd}
+.folder input{width:auto;margin-right:10px}
+.status{padding:10px;background:#f8fafc}
+.count{color:green;font-weight:bold;margin-top:10px}
+</style>
+</head>
+
+<body>
+
+<div class="header">📁 Drive Folder Monitor v7</div>
+
+<div class="container">
+
+<div class="card">
+<h2>Connect Google Drive</h2>
+<button onclick="connectDrive()">Connect Drive</button>
+<div id="status" class="status">Not connected</div>
+</div>
+
+<div class="card">
+<h2>Main Folder</h2>
+<input id="folderLink" placeholder="Paste Google Drive folder link">
+<button onclick="loadFolders()">Load Real Folders</button>
+</div>
+
+<div class="card">
+<h2>Folders Inside</h2>
+<input id="search" placeholder="Search folders..." onkeyup="searchFolders()">
+<div id="folders">No folders loaded</div>
+<div class="count" id="count">Selected: 0 folders</div>
+<button onclick="showSelected()">Continue</button>
+</div>
+
+<div class="card">
+<h2>Selected Folders</h2>
+<div id="selected">None</div>
+</div>
+
+</div>
+
+<script>
+const CLIENT_ID="1013716373477-i40fv00kehvaub37itenptk620pdnvhj.apps.googleusercontent.com";
+const SCOPES="https://www.googleapis.com/auth/drive.metadata.readonly";
+
+let token="";
+let allFolders=[];
+let selectedFolders=[];
+
+function connectDrive(){
+google.accounts.oauth2.initTokenClient({
+client_id:CLIENT_ID,
+scope:SCOPES,
+callback:(response)=>{
+token=response.access_token;
+document.getElementById("status").innerHTML="✅ Drive Connected";
+}
+}).requestAccessToken();
+}
+
+async function loadFolders(){
+if(!token){alert("Connect Drive first");return;}
+
+let link=document.getElementById("folderLink").value;
+let match=link.match(/[-\w]{25,}/);
+
+if(!match){alert("Invalid Drive link");return;}
+
+let q=`'${match[0]}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+
+let url="https://www.googleapis.com/drive/v3/files?q="+encodeURIComponent(q)+"&fields=files(id,name)&pageSize=1000";
+
+let res=await fetch(url,{headers:{Authorization:"Bearer "+token}});
+let data=await res.json();
+
+allFolders=data.files || [];
+showFolders(allFolders);
+}
+
+function showFolders(list){
+let box=document.getElementById("folders");
+box.innerHTML="";
+
+list.forEach(f=>{
+let checked=selectedFolders.some(x=>x.id===f.id)?"checked":"";
+box.innerHTML+=`
+<div class="folder">
+<input type="checkbox" ${checked} onchange="selectFolder(this,'${f.id}','${f.name}')">
+${f.name}
+</div>`;
+});
+}
+
+function selectFolder(box,id,name){
+if(box.checked){
+selectedFolders.push({id:id,name:name});
+}else{
+selectedFolders=selectedFolders.filter(x=>x.id!==id);
+}
+
+document.getElementById("count").innerHTML=
+"Selected: "+selectedFolders.length+" folders";
+}
+
+function searchFolders(){
+let t=document.getElementById("search").value.toLowerCase();
+showFolders(allFolders.filter(f=>f.name.toLowerCase().includes(t)));
+}
+
+function showSelected(){
+document.getElementById("selected").innerHTML=
+selectedFolders.length ?
+selectedFolders.map(x=>"✅ "+x.name).join("<br>") :
+"None";
+}
+</script>
+
+</body>
+</html>
